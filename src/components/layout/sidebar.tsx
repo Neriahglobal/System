@@ -87,7 +87,7 @@ export function SidebarBrand({ collapsed }: { collapsed: boolean }) {
       {!collapsed && (
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-white">Neriah ERP</p>
-          <p className="truncate text-[11px] text-sidebar-muted">Agrobusiness Solution</p>
+          <p className="truncate text-[11px] text-sidebar-muted">Group of Companies Limited</p>
         </div>
       )}
     </div>
