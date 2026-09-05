@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Building2, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { NAV_ITEMS } from "./nav-config";
 import { cn } from "@/lib/utils";
 
@@ -74,13 +75,19 @@ export function SidebarBrand({ collapsed }: { collapsed: boolean }) {
         collapsed && "justify-center px-0",
       )}
     >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sidebar-accent text-sidebar-accent-foreground">
-        <Building2 className="h-[18px] w-[18px]" />
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white">
+        <Image
+          src="/logo.jpg"
+          alt="Neriah Global"
+          width={1080}
+          height={964}
+          className="h-full w-full object-contain p-0.5"
+        />
       </div>
       {!collapsed && (
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-white">Neriah ERP</p>
-          <p className="truncate text-[11px] text-sidebar-muted">Group ERP</p>
+          <p className="truncate text-[11px] text-sidebar-muted">Agrobusiness Solution</p>
         </div>
       )}
     </div>

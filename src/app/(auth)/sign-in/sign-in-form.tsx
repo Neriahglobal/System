@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { Building2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { signIn, type SignInState } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,11 +31,18 @@ export function SignInForm({ redirectTo }: { redirectTo?: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
-          <Building2 className="h-6 w-6" />
+      <div className="flex flex-col items-center gap-3 text-center">
+        <div className="rounded-2xl bg-white p-3 shadow-md">
+          <Image
+            src="/logo.jpg"
+            alt="Neriah Global Agrobusiness Solution"
+            width={1080}
+            height={964}
+            priority
+            className="h-24 w-auto"
+          />
         </div>
-        <h1 className="text-xl font-semibold text-sidebar-foreground">Neriah ERP</h1>
+        <h1 className="text-lg font-semibold text-sidebar-foreground">Neriah ERP</h1>
         <p className="text-sm text-sidebar-muted">
           Neriah Global Group of Companies Limited
         </p>
