@@ -17,12 +17,14 @@ export interface ShellUser {
 
 export function AppShell({
   user,
+  permissions,
   companyName,
   branches,
   activeBranchId,
   children,
 }: {
   user: ShellUser;
+  permissions: string[];
   companyName: string;
   branches: BranchOption[];
   activeBranchId: string | null;
@@ -61,7 +63,7 @@ export function AppShell({
         )}
       >
         <SidebarBrand collapsed={collapsed} />
-        <SidebarNav isOwner={user.isOwner} collapsed={collapsed} />
+        <SidebarNav isOwner={user.isOwner} permissions={permissions} collapsed={collapsed} />
       </aside>
 
       {/* Mobile drawer */}
@@ -84,6 +86,7 @@ export function AppShell({
             </div>
             <SidebarNav
               isOwner={user.isOwner}
+              permissions={permissions}
               collapsed={false}
               onNavigate={() => setMobileOpen(false)}
             />

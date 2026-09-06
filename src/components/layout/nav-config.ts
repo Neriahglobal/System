@@ -2,34 +2,77 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   ShoppingCart,
+  Boxes,
   Truck,
   Coins,
   Receipt,
   ArrowLeftRight,
-  Boxes,
-  BookOpen,
   BarChart3,
   Settings,
 } from "lucide-react";
 
-export interface NavItem {
+export interface NavLeaf {
   label: string;
   href: string;
-  icon: LucideIcon;
-  /** Enabled in Phase 1? Disabled items render greyed-out and non-clickable. */
   enabled: boolean;
-  ownerOnly?: boolean;
+  /** Permission required to see it (Owner always sees enabled items). */
+  requires?: string;
 }
 
-export const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, enabled: true },
-  { label: "Sales", href: "/sales", icon: ShoppingCart, enabled: false },
-  { label: "Purchases", href: "/purchases", icon: Truck, enabled: false },
-  { label: "Other Income", href: "/other-income", icon: Coins, enabled: false },
-  { label: "Expenses", href: "/expenses", icon: Receipt, enabled: false },
-  { label: "Cash Transfers", href: "/cash-transfers", icon: ArrowLeftRight, enabled: false },
-  { label: "Inventory", href: "/inventory", icon: Boxes, enabled: false },
-  { label: "Kardex", href: "/kardex", icon: BookOpen, enabled: false },
-  { label: "Reports", href: "/reports", icon: BarChart3, enabled: false },
-  { label: "Admin", href: "/admin", icon: Settings, enabled: true, ownerOnly: true },
+export interface NavEntry {
+  label: string;
+  icon: LucideIcon;
+  /** A direct link (leaf) ... */
+  href?: string;
+  enabled: boolean;
+  ownerOnly?: boolean;
+  requires?: string;
+  /** ...or a group of children. */
+  items?: NavLeaf[];
+}
+
+export const NAV: NavEntry[] = [
+  { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard", enabled: true },
+  {
+    label: "Sales",
+    icon: ShoppingCart,
+    enabled: true,
+    requires: "sales.view",
+    items: [
+      { label: "Create Sale", href: "/sales/new", enabled: true, requires: "sales.create" },
+      { label: "Sales History", href: "/sales/history", enabled: true, requires: "sales.view" },
+      { label: "Customer Payments", href: "/sales/customer-payments", enabled: true, requires: "sales.view" },
+    ],
+  },
+  {
+    label: "Inventory",
+    icon: Boxes,
+    enabled: true,
+    requires: "inventory.view",
+    items: [
+      { label: "Current Stock", href: "/inventory", enabled: true, requires: "inventory.view" },
+      { label: "Kardex", href: "/inventory/kardex", enabled: true, requires: "inventory.view_kardex" },
+      { label: "Stock Transfers", href: "/inventory/transfers", enabled: true, requires: "inventory.transfer_create" },
+      { label: "Stock Adjustments", href: "/inventory/adjustments", enabled: true, requires: "inventory.adjustment_create" },
+      { label: "Opening Balances", href: "/inventory/opening-balances", enabled: true, requires: "inventory.opening_balance" },
+    ],
+  },
+  { label: "Purchases", icon: Truck, href: "/purchases", enabled: false },
+  { label: "Other Income", icon: Coins, href: "/other-income", enabled: false },
+  { label: "Expenses", icon: Receipt, href: "/expenses", enabled: false },
+  { label: "Cash Transfers", icon: ArrowLeftRight, href: "/cash-transfers", enabled: false },
+  { label: "Reports", icon: BarChart3, href: "/reports", enabled: false },
+  { label: "Admin", icon: Settings, href: "/admin", enabled: true, ownerOnly: true },
 ];
+
+/** Whether a user (with a permission set) may see a nav entry/leaf. */
+export function canSee(
+  entry: { requires?: string; ownerOnly?: boolean },
+  isOwner: boolean,
+  perms: Set<string>,
+): boolean {
+  if (entry.ownerOnly) return isOwner;
+  if (isOwner) return true;
+  if (entry.requires) return perms.has(entry.requires);
+  return true;
+}

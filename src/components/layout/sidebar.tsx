@@ -4,32 +4,36 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Lock } from "lucide-react";
-import { NAV_ITEMS } from "./nav-config";
+import { NAV, canSee } from "./nav-config";
 import { cn } from "@/lib/utils";
 
 export function SidebarNav({
   isOwner,
+  permissions,
   collapsed,
   onNavigate,
 }: {
   isOwner: boolean;
+  permissions: string[];
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const perms = new Set(permissions);
+
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-3">
-      {NAV_ITEMS.map((item) => {
-        if (item.ownerOnly && !isOwner) return null;
-        const Icon = item.icon;
-        const active =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+      {NAV.map((entry) => {
+        const Icon = entry.icon;
 
-        if (!item.enabled) {
+        // Disabled future modules
+        if (!entry.enabled) {
           return (
             <div
-              key={item.href}
+              key={entry.label}
               title="Available in a later phase"
               className={cn(
                 "flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-muted/60",
@@ -39,7 +43,7 @@ export function SidebarNav({
               <Icon className="h-[18px] w-[18px] shrink-0" />
               {!collapsed && (
                 <>
-                  <span className="flex-1 truncate">{item.label}</span>
+                  <span className="flex-1 truncate">{entry.label}</span>
                   <Lock className="h-3 w-3" />
                 </>
               )}
@@ -47,19 +51,60 @@ export function SidebarNav({
           );
         }
 
+        if (!canSee(entry, isOwner, perms)) return null;
+
+        // Group with children
+        if (entry.items) {
+          const visibleItems = entry.items.filter((it) => canSee(it, isOwner, perms));
+          if (visibleItems.length === 0) return null;
+          const groupActive = visibleItems.some((it) => isActive(it.href));
+          return (
+            <div key={entry.label} className="mt-1">
+              <div
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-sidebar-muted",
+                  collapsed && "justify-center px-0",
+                )}
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+                {!collapsed && <span className="flex-1 truncate">{entry.label}</span>}
+              </div>
+              {!collapsed &&
+                visibleItems.map((it) => (
+                  <Link
+                    key={it.href}
+                    href={it.href}
+                    onClick={onNavigate}
+                    className={cn(
+                      "ml-3 flex items-center gap-3 rounded-md px-3 py-1.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-active",
+                      isActive(it.href) && "bg-sidebar-active text-white",
+                    )}
+                  >
+                    <span className="flex-1 truncate">{it.label}</span>
+                  </Link>
+                ))}
+              {collapsed && groupActive && (
+                <div className="mx-auto my-0.5 h-1 w-1 rounded-full bg-sidebar-accent" />
+              )}
+            </div>
+          );
+        }
+
+        // Leaf link
+        const href = entry.href!;
         return (
           <Link
-            key={item.href}
-            href={item.href}
+            key={href}
+            href={href}
             onClick={onNavigate}
             className={cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-active",
-              active && "bg-sidebar-active text-white",
+              isActive(href) && "bg-sidebar-active text-white",
               collapsed && "justify-center px-0",
             )}
           >
             <Icon className="h-[18px] w-[18px] shrink-0" />
-            {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+            {!collapsed && <span className="flex-1 truncate">{entry.label}</span>}
           </Link>
         );
       })}

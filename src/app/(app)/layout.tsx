@@ -53,6 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         roleName: user.role?.name ?? "No role",
         isOwner: user.isOwner,
       }}
+      permissions={Array.from(user.permissions)}
       companyName={companyName}
       branches={branches}
       activeBranchId={activeBranchId}

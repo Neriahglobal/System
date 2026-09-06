@@ -2,10 +2,10 @@
 
 ERP and accounting system for **Neriah Global Group of Companies Limited**.
 
-This repository currently implements **Phase 1 — System Foundation**: authentication,
-role-based access control, and administration of master data. Transactional modules
-(Sales, Purchases, Expenses, Other Income, Cash Transfers, Inventory, Kardex and
-accounting reports) are intentionally **deferred to later phases**.
+This repository implements **Phase 1 — System Foundation** (auth, RBAC, master data) and
+**Phase 2 — Sales, Customer Payments, Inventory & Kardex**. Purchases, Expenses, Other
+Income, Cash Transfers and full financial reports are intentionally **deferred to later
+phases** and appear as locked items in the sidebar.
 
 - Base currency: **TZS** · Timezone: **Africa/Dar_es_Salaam** · Dates: **DD/MM/YYYY**
 - Multi-company ready (starts with one company: `NERIAH`).
@@ -152,10 +152,94 @@ role/company/branch ids are never trusted.
 ## 10. Test & build commands
 
 ```bash
-npm run typecheck      # tsc --noEmit
-npm run build          # production build (webpack on this machine)
+npm run typecheck        # tsc --noEmit
+npm run test             # pure calculation unit tests (tax, weighted-average)
+npm run test:integration # end-to-end posting test against the DB (BEGIN..ROLLBACK, no data kept)
+npm run build            # production build (webpack on this machine)
 npm run lint
 ```
+
+---
+
+# Phase 2 — Sales, Customer Payments, Inventory & Kardex
+
+## Setup
+Phase 2 adds migrations `0006`–`0012`. On an existing Phase 1 database:
+
+```bash
+npm run db:migrate   # applies 0006-0012 (idempotent)
+npm run db:seed      # registers the new Phase 2 permissions & role grants
+```
+
+The seed adds fine-grained permissions (`sales.view_cost`, `sales.override_price`,
+`sales.sell_below_cost`, `sales.receive_payment`, `sales.create_return`,
+`inventory.view_cost`, `inventory.view_kardex`, `inventory.opening_balance`,
+`inventory.adjustment_create/adjustment_post`, `inventory.transfer_create/dispatch/receive`)
+and maps them to the default roles. `transactions.delete_draft` and `transactions.void`
+remain Owner-only.
+
+## Atomic posting (RPC functions)
+Every posting operation runs inside **one PostgreSQL function** (a single transaction):
+it locks stock and sequence rows, recalculates all totals on the server, writes stock,
+kardex, journal, payment and status records together, and is guarded by an idempotency
+key. Functions are `SECURITY DEFINER` with a fixed `search_path`, and `EXECUTE` is granted
+only to `service_role` (called by trusted server actions after the user, permission and
+branch access have been verified). Functions: `post_inventory_opening`, `post_stock_adjustment`,
+`post_sale`, `post_customer_receipt`, `post_sales_return`, `dispatch_stock_transfer`,
+`receive_stock_transfer`, and matching `void_*`, plus helpers `record_stock_movement`
+(weighted-average costing), `next_document_number`, `create_journal`, `recalc_sale`.
+
+## Inventory costing
+**Weighted-average by (company, branch, product).** Incoming stock:
+`new avg = (old value + qty×cost) / (old qty + qty)`. Outgoing uses the average *before*
+the movement and stores that cost on the movement (COGS). The immutable `stock_movements`
+ledger is the source of truth; `stock_balances` is a reconciling projection. Negative stock
+is blocked; a sale cannot post without sufficient stock; non-`track_inventory` products
+create no stock or COGS entries.
+
+## Accounting entries
+- **Sale:** Dr Cash/Bank/MoMo (received) + Dr A/R (unpaid); Cr Sales Revenue (net); Cr Output
+  VAT (tax). Tracked lines also Dr COGS / Cr Inventory. Debits always equal credits.
+- **Customer receipt:** Dr payment account; Cr A/R.
+- **Sales return:** Dr Sales Returns (net) + Dr Output VAT reversal; Cr payment account / A/R.
+  Saleable returns also Dr Inventory / Cr COGS at the original captured cost.
+- **Opening balance:** Dr Inventory; Cr Opening Balance Equity.
+- **Adjustment +:** Dr Inventory / Cr Inventory Adjustment Gain. **Adjustment −:** Dr Inventory
+  Shrinkage / Cr Inventory. **Transfers** create no GL journal (ownership unchanged).
+
+## Workflows
+- **Opening stock:** Owner creates a draft, posts it → stock-in movements + balanced journal.
+- **Sales:** create a draft (no stock/GL effect) → Post allocates the invoice number and does
+  everything atomically. Payment status (unpaid / partial / paid / refunded) is server-computed.
+- **Customer payments:** pick a customer, allocate the receipt across their outstanding invoices
+  (allocations must equal the amount — no overpayment), Post settles the invoices.
+- **Sales returns:** reference a posted sale; quantities capped at sold − prior returns; original
+  price/tax/cost come from the sale line; saleable stock is restored at original cost.
+- **Adjustments:** increase (needs cost) / decrease (uses current average); reason mandatory.
+- **Transfers:** draft → dispatch (stock out of source, into transit) → receive (partial allowed).
+
+## Voiding rules
+Only the Owner can void posted documents. Voids require a reason, reverse stock and accounting,
+keep the original visible, and never reuse a number. A sale cannot be voided while it has posted
+receipts or returns — reverse those first. Posted documents and ledgers are never hard-deleted.
+
+## Routes added
+`/sales/new`, `/sales/history`, `/sales/[id]`, `/sales/[id]/return`, `/sales/customer-payments`,
+`/sales/customer-payments/new`, `/inventory`, `/inventory/kardex`, `/inventory/opening-balances`,
+`/inventory/adjustments`, `/inventory/transfers`, `/inventory/transfers/[id]`, plus printable
+`/invoice/[id]` and `/receipt/[id]`.
+
+## Tables added
+`stock_balances`, `stock_movements`, `journal_entries`, `journal_lines`, `inventory_openings(+lines)`,
+`stock_adjustments(+lines)`, `stock_transfers(+lines)`, `sales(+lines)`, `sale_payments`,
+`customer_receipts(+allocations)`, `sales_returns(+lines,+refunds)`, `transaction_status_history`,
+`idempotency_keys`. RLS is enabled and forced on all of them: reads are company-scoped, and there
+are no client write policies (all mutations flow through service-role server actions).
+
+## Testing
+`npm run test` (calculation units) and `npm run test:integration` (posts an opening, sale, receipt
+and return through the real RPCs and asserts stock, weighted-average cost, balanced journals,
+duplicate-post and insufficient-stock rejection — all inside a transaction that rolls back).
 
 ## Phase 1 scope
 
@@ -164,9 +248,9 @@ products, categories, brands, units, tax codes, payment accounts, other-income t
 expense categories, customers, suppliers, chart of accounts, roles & permissions, users,
 document numbering, accounting periods, audit log), unauthorized page, account/profile.
 
-**Deferred to later phases:** Sales, Purchases, Expenses, Other Income, Cash Transfers,
-Inventory movements, Kardex, and accounting reports. These appear as locked items in the
-sidebar and have no transaction pages.
+**Deferred to later phases:** Purchases, Expenses, Other Income, Cash Transfers, and full
+financial reports. These appear as locked items in the sidebar and have no transaction pages.
+(Sales, Customer Payments, Inventory and Kardex are delivered in Phase 2 — see below.)
 
 ## Project structure
 

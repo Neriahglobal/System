@@ -36,6 +36,19 @@ export const ACTIONS = [
   "void",
   "delete_draft",
   "manage",
+  // Phase 2 fine-grained actions
+  "view_cost",
+  "override_price",
+  "sell_below_cost",
+  "receive_payment",
+  "create_return",
+  "view_kardex",
+  "opening_balance",
+  "adjustment_create",
+  "adjustment_post",
+  "transfer_create",
+  "transfer_dispatch",
+  "transfer_receive",
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
@@ -71,19 +84,27 @@ const TXN_ACTIONS: Action[] = [
 /** The full set of permissions seeded into the database. */
 export const PERMISSION_DEFS: PermissionDef[] = [
   ...p("dashboard", ["view"]),
-  ...p("sales", TXN_ACTIONS),
+  ...p("sales", [
+    ...TXN_ACTIONS,
+    "view_cost", "override_price", "sell_below_cost", "receive_payment", "create_return",
+  ]),
   ...p("purchases", TXN_ACTIONS),
   ...p("other_income", TXN_ACTIONS),
   ...p("expenses", TXN_ACTIONS),
   ...p("cash_transfers", TXN_ACTIONS),
-  ...p("inventory", ["view", "create", "edit_draft", "post", "export", "manage"]),
+  ...p("inventory", [
+    "view", "create", "edit_draft", "post", "export", "manage",
+    "view_cost", "view_kardex", "opening_balance",
+    "adjustment_create", "adjustment_post",
+    "transfer_create", "transfer_dispatch", "transfer_receive",
+  ]),
   ...p("kardex", ["view", "export"]),
   ...p("reports", ["view", "export"]),
   ...p("admin", ["view", "manage"]),
   ...p("users", ["view", "manage"]),
   ...p("roles", ["view", "manage"]),
   ...p("audit_log", ["view", "export"]),
-  // Future guarded actions - Owner only. No "delete posted" permission exists.
+  // Owner-only guarded actions. No "delete posted" permission exists.
   ...p("transactions", ["delete_draft", "void"]),
 ];
 
@@ -117,11 +138,15 @@ export const ROLE_DEFS: RoleDef[] = [
     permissions: [
       "dashboard.view",
       "sales.view", "sales.create", "sales.edit_draft", "sales.post", "sales.approve", "sales.export", "sales.void",
+      "sales.view_cost", "sales.override_price", "sales.receive_payment", "sales.create_return",
       "purchases.view", "purchases.create", "purchases.edit_draft", "purchases.post", "purchases.approve", "purchases.export", "purchases.void",
       "other_income.view", "other_income.create", "other_income.edit_draft", "other_income.post", "other_income.approve", "other_income.export",
       "expenses.view", "expenses.create", "expenses.edit_draft", "expenses.post", "expenses.approve", "expenses.export",
       "cash_transfers.view", "cash_transfers.create", "cash_transfers.edit_draft", "cash_transfers.post", "cash_transfers.approve",
       "inventory.view", "inventory.create", "inventory.edit_draft", "inventory.post", "inventory.manage", "inventory.export",
+      "inventory.view_cost", "inventory.view_kardex",
+      "inventory.adjustment_create", "inventory.adjustment_post",
+      "inventory.transfer_create", "inventory.transfer_dispatch", "inventory.transfer_receive",
       "kardex.view", "kardex.export",
       "reports.view", "reports.export",
     ],
@@ -135,11 +160,13 @@ export const ROLE_DEFS: RoleDef[] = [
     permissions: [
       "dashboard.view",
       "sales.view", "sales.create", "sales.edit_draft", "sales.post", "sales.export",
+      "sales.view_cost", "sales.receive_payment",
       "purchases.view", "purchases.create", "purchases.edit_draft", "purchases.post", "purchases.export",
       "other_income.view", "other_income.create", "other_income.edit_draft", "other_income.post",
       "expenses.view", "expenses.create", "expenses.edit_draft", "expenses.post",
       "cash_transfers.view", "cash_transfers.create", "cash_transfers.edit_draft", "cash_transfers.post",
-      "inventory.view", "kardex.view", "kardex.export",
+      "inventory.view", "inventory.view_cost", "inventory.view_kardex",
+      "kardex.view", "kardex.export",
       "reports.view", "reports.export",
     ],
   },
@@ -151,8 +178,8 @@ export const ROLE_DEFS: RoleDef[] = [
     isProtected: false,
     permissions: [
       "dashboard.view",
-      "sales.view", "sales.create", "sales.edit_draft", "sales.post",
-      "inventory.view", "kardex.view",
+      "sales.view", "sales.create", "sales.edit_draft", "sales.post", "sales.receive_payment",
+      "inventory.view", "inventory.view_kardex", "kardex.view",
     ],
   },
   {
@@ -164,6 +191,8 @@ export const ROLE_DEFS: RoleDef[] = [
     permissions: [
       "dashboard.view",
       "inventory.view", "inventory.create", "inventory.edit_draft", "inventory.post", "inventory.manage",
+      "inventory.view_kardex", "inventory.adjustment_create",
+      "inventory.transfer_create", "inventory.transfer_dispatch", "inventory.transfer_receive",
       "kardex.view", "kardex.export",
       "purchases.view",
     ],
@@ -180,7 +209,7 @@ export const ROLE_DEFS: RoleDef[] = [
       "purchases.view", "purchases.export",
       "other_income.view", "expenses.view",
       "cash_transfers.view",
-      "inventory.view", "kardex.view", "kardex.export",
+      "inventory.view", "inventory.view_kardex", "kardex.view", "kardex.export",
       "reports.view", "reports.export",
     ],
   },
