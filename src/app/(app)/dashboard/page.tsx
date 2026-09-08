@@ -71,6 +71,43 @@ export default async function DashboardPage() {
 
   const recent = sales.slice(0, 6);
 
+  // ---- Phase 3 metrics ----
+  const showBal = can(user, "cash_accounts.view_balance");
+  const [{ data: purchases }, { data: expensesData }, { data: incomeData }, { data: supPaysToday }, { data: payables }, { data: accounts }] =
+    await Promise.all([
+      admin.from("purchases").select("document_date, grand_total").eq("company_id", companyId).eq("document_status", "posted"),
+      admin.from("expenses").select("document_date, grand_total").eq("company_id", companyId).eq("document_status", "posted"),
+      admin.from("other_income_transactions").select("document_date, grand_total").eq("company_id", companyId).eq("document_status", "posted"),
+      admin.from("supplier_payments").select("amount").eq("company_id", companyId).eq("document_status", "posted").eq("document_date", today),
+      admin.from("supplier_payables").select("outstanding").eq("company_id", companyId).in("status", ["open", "partial"]),
+      admin.from("payment_accounts").select("id").eq("company_id", companyId).eq("is_active", true),
+    ]);
+  const sum = (rows: { grand_total?: number; amount?: number; outstanding?: number }[] | null, field: "grand_total" | "amount" | "outstanding", filter?: (r: { document_date?: string }) => boolean) =>
+    (rows ?? []).filter((r) => !filter || filter(r as { document_date?: string })).reduce((a, r) => a + Number((r as Record<string, number>)[field] ?? 0), 0);
+  const purToday = sum(purchases as never, "grand_total", (r) => r.document_date === today);
+  const purMonth = sum(purchases as never, "grand_total", (r) => (r.document_date ?? "") >= monthStart);
+  const expToday = sum(expensesData as never, "grand_total", (r) => r.document_date === today);
+  const expMonth = sum(expensesData as never, "grand_total", (r) => (r.document_date ?? "") >= monthStart);
+  const incToday = sum(incomeData as never, "grand_total", (r) => r.document_date === today);
+  const incMonth = sum(incomeData as never, "grand_total", (r) => (r.document_date ?? "") >= monthStart);
+  const supPayToday = (supPaysToday ?? []).reduce((a, r) => a + Number(r.amount), 0);
+  const outstandingAP = (payables ?? []).reduce((a, r) => a + Number(r.outstanding), 0);
+  let cashTotal = 0;
+  if (showBal) {
+    const balances = await Promise.all((accounts ?? []).map(async (a) => Number((await admin.rpc("payment_account_balance", { p_pa: a.id })).data ?? 0)));
+    cashTotal = balances.reduce((s, b) => s + b, 0);
+  }
+  const p3: { label: string; value: string; hidden?: boolean }[] = [
+    { label: "Purchases today", value: formatMoney(purToday) },
+    { label: "Purchases this month", value: formatMoney(purMonth) },
+    { label: "Supplier paid today", value: formatMoney(supPayToday) },
+    { label: "Outstanding payables", value: formatMoney(outstandingAP) },
+    { label: "Expenses this month", value: formatMoney(expMonth) },
+    { label: "Other income month", value: formatMoney(incMonth) },
+    { label: "Cash & bank total", value: formatMoney(cashTotal), hidden: !showBal },
+  ].filter((s) => !s.hidden);
+  void expToday; void incToday; void purToday;
+
   return (
     <div>
       <PageHeader title={`Welcome${user.fullName ? `, ${user.fullName.split(" ")[0]}` : ""}`} description={`${company?.name ?? "Neriah ERP"} · Today ${formatDate(today)}`} />
@@ -87,6 +124,17 @@ export default async function DashboardPage() {
           );
         })}
       </div>
+
+      {p3.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+          {p3.map((s) => (
+            <Card key={s.label} className="p-4">
+              <p className="text-base font-semibold tabular-nums">{s.value}</p>
+              <p className="text-xs text-muted-foreground">{s.label}</p>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Card className="mt-6">
         <CardContent className="p-5">

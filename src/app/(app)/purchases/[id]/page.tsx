@@ -1,0 +1,121 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { requirePermissionPage } from "@/lib/auth/guards";
+import { getActiveContext, can } from "@/lib/context";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { postPurchase, deletePurchaseDraft, voidPurchase } from "@/lib/purchases/actions";
+import { PageHeader } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { DocStatusBadge, PayStatusBadge } from "@/components/common/doc-status-badge";
+import { TxnActions } from "@/components/common/txn-actions";
+import { formatMoney, formatQuantity, formatDate } from "@/lib/format";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+export const metadata: Metadata = { title: "Purchase" };
+type Params = Promise<{ id: string }>;
+
+export default async function PurchaseDetailPage(props: { params: Params }) {
+  await requirePermissionPage("purchases.view");
+  const ctx = await getActiveContext();
+  const { id } = await props.params;
+  const admin = createAdminClient();
+  const showCost = can(ctx.user, "purchases.view_cost");
+
+  const { data: pur } = await admin.from("purchases")
+    .select("*, supplier:suppliers(code,name,phone), branch:branches(name,code)").eq("id", id).maybeSingle();
+  if (!pur || pur.company_id !== ctx.companyId) notFound();
+
+  const [{ data: lines }, { data: payments }, { data: returns }] = await Promise.all([
+    admin.from("purchase_lines").select("*").eq("purchase_id", id).order("line_no"),
+    admin.from("purchase_payments").select("amount, payment_date, account:payment_accounts(name)").eq("purchase_id", id),
+    admin.from("purchase_returns").select("id, document_number, document_date, total, document_status").eq("purchase_id", id).order("created_at", { ascending: false }),
+  ]);
+
+  const s = pur as Record<string, unknown> as {
+    document_number: string | null; document_status: string; payment_status: string; document_date: string;
+    supplier_invoice_number: string | null; due_date: string | null; grand_total: number; net_total: number;
+    tax_total: number; recoverable_tax: number; amount_paid: number; outstanding: number; inventory_value: number;
+    void_reason: string | null; supplier: { name: string; phone: string | null } | null; branch: { name: string } | null;
+  };
+  const ll = (lines ?? []) as unknown as Array<{ id: string; description: string; quantity: number; unit_cost: number; discount: number; tax_name: string | null; tax_rate: number; net_amount: number; tax_amount: number; gross_amount: number; inventory_value: number }>;
+
+  return (
+    <div>
+      <PageHeader title={s.document_number ?? "Purchase (draft)"} description={`${s.branch?.name} · ${formatDate(s.document_date)}`}
+        actions={
+          <div className="flex items-center gap-2">
+            {s.document_status === "posted" && Number(s.outstanding) > 0 && can(ctx.user, "purchases.record_payment") && (
+              <Button asChild variant="outline"><Link href={`/purchases/supplier-payments/new?purchase=${id}`}>Record payment</Link></Button>
+            )}
+            {s.document_status === "posted" && can(ctx.user, "purchases.create_return") && (
+              <Button asChild variant="outline"><Link href={`/purchases/${id}/return`}>Return</Link></Button>
+            )}
+            <TxnActions id={id} status={s.document_status} canPost={can(ctx.user, "purchases.post")} canOwner={can(ctx.user, "transactions.void")}
+              postAction={postPurchase} deleteAction={deletePurchaseDraft} voidAction={voidPurchase} afterDeletePush="/purchases/history" />
+          </div>
+        } />
+
+      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card><CardContent className="space-y-1 p-5 text-sm">
+          <p className="text-xs uppercase text-muted-foreground">Supplier</p>
+          <p className="font-medium">{s.supplier?.name}</p><p className="text-muted-foreground">{s.supplier?.phone ?? ""}</p>
+          <p className="text-xs text-muted-foreground">Invoice: {s.supplier_invoice_number ?? "—"}</p>
+        </CardContent></Card>
+        <Card><CardContent className="space-y-2 p-5 text-sm">
+          <div className="flex justify-between"><span className="text-muted-foreground">Status</span><DocStatusBadge status={s.document_status} /></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><PayStatusBadge status={s.payment_status} /></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Due date</span><span>{s.due_date ? formatDate(s.due_date) : "—"}</span></div>
+          {s.void_reason && <div className="flex justify-between"><span className="text-muted-foreground">Void reason</span><span>{s.void_reason}</span></div>}
+        </CardContent></Card>
+        <Card><CardContent className="space-y-1.5 p-5 text-sm">
+          <div className="flex justify-between"><span className="text-muted-foreground">Net</span><span className="tabular-nums">{formatMoney(s.net_total)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span className="tabular-nums">{formatMoney(s.tax_total)}</span></div>
+          <div className="flex justify-between font-semibold"><span>Total</span><span className="tabular-nums">{formatMoney(s.grand_total)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Paid</span><span className="tabular-nums">{formatMoney(s.amount_paid)}</span></div>
+          <div className="flex justify-between font-medium"><span>Outstanding</span><span className="tabular-nums">{formatMoney(s.outstanding)}</span></div>
+          {showCost && <div className="mt-1 flex justify-between border-t border-border pt-1"><span className="text-muted-foreground">Inventory value</span><span className="tabular-nums">{formatMoney(s.inventory_value)}</span></div>}
+          {showCost && <div className="flex justify-between"><span className="text-muted-foreground">Recoverable VAT</span><span className="tabular-nums">{formatMoney(s.recoverable_tax)}</span></div>}
+        </CardContent></Card>
+      </div>
+
+      <Card className="mb-4"><CardContent className="p-0">
+        <Table>
+          <TableHeader><TableRow>
+            <TableHead>Item</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Cost</TableHead>
+            <TableHead className="text-right">Disc</TableHead><TableHead>Tax</TableHead><TableHead className="text-right">Net</TableHead><TableHead className="text-right">Total</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {ll.map((l) => (
+              <TableRow key={l.id}>
+                <TableCell>{l.description}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatQuantity(l.quantity)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatMoney(l.unit_cost)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatMoney(l.discount)}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{l.tax_name ? `${l.tax_name} (${l.tax_rate}%)` : "—"}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatMoney(l.net_amount)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatMoney(l.gross_amount)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent></Card>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card><CardContent className="p-5">
+          <h3 className="mb-2 text-sm font-semibold">Payments</h3>
+          {(payments ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No payments.</p> : (
+            <div className="space-y-1 text-sm">{(payments ?? []).map((p, i) => { const pp = p as unknown as { account: { name: string } | null; amount: number; payment_date: string }; return <div key={i} className="flex justify-between"><span className="text-muted-foreground">{pp.account?.name} · {formatDate(pp.payment_date)}</span><span className="tabular-nums">{formatMoney(pp.amount)}</span></div>; })}</div>
+          )}
+        </CardContent></Card>
+        <Card><CardContent className="p-5">
+          <h3 className="mb-2 text-sm font-semibold">Returns</h3>
+          {(returns ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No returns.</p> : (
+            <div className="space-y-1 text-sm">{(returns ?? []).map((r) => { const rr = r as { id: string; document_number: string | null; document_date: string; total: number; document_status: string }; return <div key={rr.id} className="flex justify-between"><span className="text-muted-foreground">{rr.document_number} · {formatDate(rr.document_date)} · <DocStatusBadge status={rr.document_status} /></span><span className="tabular-nums">{formatMoney(rr.total)}</span></div>; })}</div>
+          )}
+        </CardContent></Card>
+      </div>
+    </div>
+  );
+}

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx scripts/test.ts",
     "test:integration": "tsx scripts/itest.ts",
+    "test:phase3": "tsx scripts/itest3.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "bootstrap:owner": "tsx scripts/bootstrap-owner.ts"

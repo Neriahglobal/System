@@ -57,10 +57,49 @@ export const NAV: NavEntry[] = [
       { label: "Opening Balances", href: "/inventory/opening-balances", enabled: true, requires: "inventory.opening_balance" },
     ],
   },
-  { label: "Purchases", icon: Truck, href: "/purchases", enabled: false },
-  { label: "Other Income", icon: Coins, href: "/other-income", enabled: false },
-  { label: "Expenses", icon: Receipt, href: "/expenses", enabled: false },
-  { label: "Cash Transfers", icon: ArrowLeftRight, href: "/cash-transfers", enabled: false },
+  {
+    label: "Purchases",
+    icon: Truck,
+    enabled: true,
+    requires: "purchases.view",
+    items: [
+      { label: "Create Purchase", href: "/purchases/new", enabled: true, requires: "purchases.create" },
+      { label: "Purchase History", href: "/purchases/history", enabled: true, requires: "purchases.view" },
+      { label: "Supplier Payments", href: "/purchases/supplier-payments", enabled: true, requires: "purchases.record_payment" },
+    ],
+  },
+  {
+    label: "Expenses",
+    icon: Receipt,
+    enabled: true,
+    requires: "expenses.view",
+    items: [
+      { label: "Record Expense", href: "/expenses/new", enabled: true, requires: "expenses.create" },
+      { label: "Expense History", href: "/expenses/history", enabled: true, requires: "expenses.view" },
+    ],
+  },
+  {
+    label: "Other Income",
+    icon: Coins,
+    enabled: true,
+    requires: "other_income.view",
+    items: [
+      { label: "Record Income", href: "/other-income/new", enabled: true, requires: "other_income.create" },
+      { label: "Income History", href: "/other-income/history", enabled: true, requires: "other_income.view" },
+    ],
+  },
+  {
+    label: "Cash and Banks",
+    icon: ArrowLeftRight,
+    enabled: true,
+    requires: "cash_accounts.view",
+    items: [
+      { label: "Accounts", href: "/cash-and-banks", enabled: true, requires: "cash_accounts.view" },
+      { label: "Cash Transfer", href: "/cash-and-banks/transfer", enabled: true, requires: "cash_transfers.create" },
+      { label: "Transfers", href: "/cash-and-banks/transfers", enabled: true, requires: "cash_transfers.view" },
+      { label: "Opening Balances", href: "/cash-and-banks/opening-balances", enabled: true, requires: "cash_accounts.opening_balance" },
+    ],
+  },
   { label: "Reports", icon: BarChart3, href: "/reports", enabled: false },
   { label: "Admin", icon: Settings, href: "/admin", enabled: true, ownerOnly: true },
 ];

@@ -23,6 +23,7 @@ export const RESOURCES = [
   "roles",
   "audit_log",
   "transactions",
+  "cash_accounts",
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -49,6 +50,10 @@ export const ACTIONS = [
   "transfer_create",
   "transfer_dispatch",
   "transfer_receive",
+  // Phase 3 fine-grained actions
+  "record_payment",
+  "view_balance",
+  "view_ledger",
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
@@ -88,10 +93,11 @@ export const PERMISSION_DEFS: PermissionDef[] = [
     ...TXN_ACTIONS,
     "view_cost", "override_price", "sell_below_cost", "receive_payment", "create_return",
   ]),
-  ...p("purchases", TXN_ACTIONS),
+  ...p("purchases", [...TXN_ACTIONS, "view_cost", "record_payment", "create_return"]),
   ...p("other_income", TXN_ACTIONS),
   ...p("expenses", TXN_ACTIONS),
   ...p("cash_transfers", TXN_ACTIONS),
+  ...p("cash_accounts", ["view", "view_balance", "view_ledger", "opening_balance"]),
   ...p("inventory", [
     "view", "create", "edit_draft", "post", "export", "manage",
     "view_cost", "view_kardex", "opening_balance",
@@ -140,9 +146,11 @@ export const ROLE_DEFS: RoleDef[] = [
       "sales.view", "sales.create", "sales.edit_draft", "sales.post", "sales.approve", "sales.export", "sales.void",
       "sales.view_cost", "sales.override_price", "sales.receive_payment", "sales.create_return",
       "purchases.view", "purchases.create", "purchases.edit_draft", "purchases.post", "purchases.approve", "purchases.export", "purchases.void",
+      "purchases.view_cost", "purchases.record_payment", "purchases.create_return",
       "other_income.view", "other_income.create", "other_income.edit_draft", "other_income.post", "other_income.approve", "other_income.export",
       "expenses.view", "expenses.create", "expenses.edit_draft", "expenses.post", "expenses.approve", "expenses.export",
-      "cash_transfers.view", "cash_transfers.create", "cash_transfers.edit_draft", "cash_transfers.post", "cash_transfers.approve",
+      "cash_transfers.view", "cash_transfers.create", "cash_transfers.edit_draft", "cash_transfers.post", "cash_transfers.approve", "cash_transfers.export",
+      "cash_accounts.view", "cash_accounts.view_balance", "cash_accounts.view_ledger",
       "inventory.view", "inventory.create", "inventory.edit_draft", "inventory.post", "inventory.manage", "inventory.export",
       "inventory.view_cost", "inventory.view_kardex",
       "inventory.adjustment_create", "inventory.adjustment_post",
@@ -162,9 +170,11 @@ export const ROLE_DEFS: RoleDef[] = [
       "sales.view", "sales.create", "sales.edit_draft", "sales.post", "sales.export",
       "sales.view_cost", "sales.receive_payment",
       "purchases.view", "purchases.create", "purchases.edit_draft", "purchases.post", "purchases.export",
+      "purchases.view_cost", "purchases.record_payment", "purchases.create_return",
       "other_income.view", "other_income.create", "other_income.edit_draft", "other_income.post",
       "expenses.view", "expenses.create", "expenses.edit_draft", "expenses.post",
       "cash_transfers.view", "cash_transfers.create", "cash_transfers.edit_draft", "cash_transfers.post",
+      "cash_accounts.view", "cash_accounts.view_balance", "cash_accounts.view_ledger",
       "inventory.view", "inventory.view_cost", "inventory.view_kardex",
       "kardex.view", "kardex.export",
       "reports.view", "reports.export",
@@ -194,7 +204,7 @@ export const ROLE_DEFS: RoleDef[] = [
       "inventory.view_kardex", "inventory.adjustment_create",
       "inventory.transfer_create", "inventory.transfer_dispatch", "inventory.transfer_receive",
       "kardex.view", "kardex.export",
-      "purchases.view",
+      "purchases.view", "purchases.create", "purchases.edit_draft", "purchases.post",
     ],
   },
   {
@@ -209,6 +219,7 @@ export const ROLE_DEFS: RoleDef[] = [
       "purchases.view", "purchases.export",
       "other_income.view", "expenses.view",
       "cash_transfers.view",
+      "cash_accounts.view", "cash_accounts.view_ledger",
       "inventory.view", "inventory.view_kardex", "kardex.view", "kardex.export",
       "reports.view", "reports.export",
     ],

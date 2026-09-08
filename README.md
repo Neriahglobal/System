@@ -2,10 +2,11 @@
 
 ERP and accounting system for **Neriah Global Group of Companies Limited**.
 
-This repository implements **Phase 1 — System Foundation** (auth, RBAC, master data) and
-**Phase 2 — Sales, Customer Payments, Inventory & Kardex**. Purchases, Expenses, Other
-Income, Cash Transfers and full financial reports are intentionally **deferred to later
-phases** and appear as locked items in the sidebar.
+This repository implements **Phase 1 — System Foundation** (auth, RBAC, master data),
+**Phase 2 — Sales, Customer Payments, Inventory & Kardex**, and **Phase 3 — Purchases,
+Supplier Payments, Purchase Returns, Expenses, Other Income, Cash Transfers and
+Payment-Account Ledgers**. Full financial statements, bank reconciliation, manual journals,
+budgets, payroll and multi-currency are intentionally **deferred to Phase 4**.
 
 - Base currency: **TZS** · Timezone: **Africa/Dar_es_Salaam** · Dates: **DD/MM/YYYY**
 - Multi-company ready (starts with one company: `NERIAH`).
@@ -240,6 +241,100 @@ are no client write policies (all mutations flow through service-role server act
 `npm run test` (calculation units) and `npm run test:integration` (posts an opening, sale, receipt
 and return through the real RPCs and asserts stock, weighted-average cost, balanced journals,
 duplicate-post and insufficient-stock rejection — all inside a transaction that rolls back).
+
+---
+
+# Phase 3 — Purchases, Expenses, Other Income & Cash
+
+## Setup
+Adds migrations `0013`–`0018`. On an existing Phase 2 database:
+
+```bash
+npm run db:migrate                 # applies 0013-0018 (idempotent)
+npm run db:seed                    # registers Phase 3 permissions & role grants
+npm run test:phase3                # posting integration test (rolls back)
+```
+
+`0013` also gives each seeded payment account its **own** ledger account (NMB/CRDB were
+sharing "Bank"), so per-account balances and ledgers derive cleanly from journal lines.
+
+## Account mapping requirements
+Posting is blocked if a required account is missing. Phase 3 adds protected accounts
+**1170 Supplier Credits**, **5200 Purchase Returns**, **5300 Purchase Price Variance**
+(seeded idempotently), and uses existing **1150 Inventory**, **1160 Input VAT**,
+**2110 Accounts Payable**, **6100 Operating Expenses**, **6200 Bank/Mobile Charges**,
+**4200 Other Income**, **2120 Output VAT**, **3200 Opening Balance Equity**. Expense
+categories and other-income types should map to a ledger account (they fall back to 6100 / 4200).
+
+## Purchase accounting
+For tracked products: **Dr Inventory** (net + non-recoverable tax) + **Dr Input VAT**
+(recoverable only); **Cr** payment accounts (paid) + **Cr Accounts Payable** (unpaid).
+Recoverable VAT is **excluded** from inventory cost; weighted-average cost updates with the
+inventory value only. Non-inventory lines debit Operating Expenses. Duplicate supplier invoice
+numbers (normalized) are rejected at posting.
+
+## Purchase-return costing
+Inventory is removed at the **current** weighted-average carrying cost. The supplier credit
+uses the **original** purchase price/tax snapshot. Any difference posts to **Purchase Price
+Variance** so the average cost is never distorted. Settlement: reduce payable / supplier credit
+/ immediate refund / mixed.
+
+## Supplier-payment allocation
+A payment funds from one or more payment accounts and allocates across the supplier's open
+**supplier_payables** (from purchases and expenses). Funding must equal allocations — no
+supplier advance in Phase 3. Each allocation is capped at the payable's outstanding. Accounting:
+**Dr Accounts Payable / Cr** funding accounts. Payment statuses recalc automatically.
+
+## Expense accounting
+**Dr** expense account (net + non-recoverable tax) + **Dr Input VAT** (recoverable);
+**Cr** payments + **Cr Accounts Payable** (unpaid). Supports paid / partial / credit.
+
+## Other-income accounting
+Fully received when posted: **Dr** payment accounts / **Cr** Other Income (net) + **Cr Output
+VAT** (if taxable). Never touches inventory or sales.
+
+## Cash-transfer accounting
+**Dr** destination (amount) + **Dr** Bank/Mobile Charges (fee); **Cr** source (amount + fee).
+The source must have sufficient funds (respecting any Owner-configured overdraft). Transfers are
+not income/expense (only the fee is an expense) and are not double-counted in company totals.
+
+## Opening-balance workflow
+Owner-only. Each line: a payment account + debit/credit + amount. Posted as a balanced journal
+against **Opening Balance Equity**; appears in the account ledger. Not stored as an editable
+field on the account.
+
+## Payment-account balances & ledger
+Balances are **derived** from posted journal lines (`payment_account_balance()`), never stored
+editable. The ledger (`/cash-and-banks/accounts/[id]`) is an immutable running-balance view of
+every posted journal line hitting that account. Available balance adds an approved overdraft.
+
+## Overdraft settings
+Owner-only (audited). Cash/mobile accounts default to no negative balance; a bank account may go
+negative only within a configured overdraft limit and date window. Transfers and supplier
+payments enforce the limit.
+
+## Permissions
+`purchases.{view,create,edit_draft,post,view_cost,record_payment,create_return,export}`,
+`expenses.{view,create,edit_draft,post,export}`, `other_income.{...}`,
+`cash_accounts.{view,view_balance,view_ledger,opening_balance}`,
+`cash_transfers.{view,create,edit_draft,post,export}`. `transactions.delete_draft` and
+`transactions.void` remain **Owner-only**.
+
+## Voiding & dependencies
+Only the Owner voids posted documents (reason required; reversing journal + inventory).
+A purchase cannot be voided while it has posted supplier payments or purchase returns (reverse
+those first) or if removing its stock would go negative. A cash transfer void is blocked if the
+destination lacks the funds to give back.
+
+## Phase 3 testing
+`npm run test:phase3` posts purchases (weighted-avg + recoverable-VAT split), supplier payments,
+purchase returns (price variance), expenses, other income and cash transfers through the real
+RPCs, asserting balances, funds checks and balanced journals — inside a transaction that rolls back.
+
+## Deferred to Phase 4
+Profit & Loss, Balance Sheet, Trial Balance, General Ledger report, VAT return, bank
+reconciliation, manual journals, budgets, payroll, multi-currency, landed-cost allocation,
+purchase orders and separate goods-received notes.
 
 ## Phase 1 scope
 
