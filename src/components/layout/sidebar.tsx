@@ -1,11 +1,19 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Lock } from "lucide-react";
+import { Lock, Loader2 } from "lucide-react";
 import { NAV, canSee } from "./nav-config";
 import { cn } from "@/lib/utils";
+
+/** Shows a spinner on the clicked link while its route is loading. */
+function NavPending() {
+  const { pending } = useLinkStatus();
+  return pending ? (
+    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sidebar-muted" />
+  ) : null;
+}
 
 export function SidebarNav({
   isOwner,
@@ -81,6 +89,7 @@ export function SidebarNav({
                     )}
                   >
                     <span className="flex-1 truncate">{it.label}</span>
+                    <NavPending />
                   </Link>
                 ))}
               {collapsed && groupActive && (
@@ -105,6 +114,7 @@ export function SidebarNav({
           >
             <Icon className="h-[18px] w-[18px] shrink-0" />
             {!collapsed && <span className="flex-1 truncate">{entry.label}</span>}
+            {!collapsed && <NavPending />}
           </Link>
         );
       })}
