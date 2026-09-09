@@ -526,3 +526,29 @@ export function getResource(key: string): ResourceConfig | undefined {
 
 /** Resources that do NOT have an is_active column (status handled differently). */
 export const NO_ACTIVE_TOGGLE = new Set<string>(["accounting-periods"]);
+
+/**
+ * Master-data resources whose code/SKU is auto-generated on create (prefix +
+ * zero-padded sequence per company, e.g. "PRD-0001"). The user may still type
+ * their own code; leaving it blank auto-generates one. The code is read-only
+ * after creation. Document Numbering (an enum) and Accounting Periods (a named
+ * period) are intentionally excluded.
+ */
+export const AUTO_CODE_PREFIXES: Record<string, string> = {
+  branches: "BR",
+  units: "UOM",
+  "product-categories": "CAT",
+  brands: "BRD",
+  "tax-codes": "TAX",
+  "payment-accounts": "PA",
+  products: "PRD",
+  customers: "CUST",
+  suppliers: "SUP",
+  "expense-categories": "EXC",
+  "other-income-types": "OIT",
+  "chart-of-accounts": "ACC",
+};
+
+export function autoCodePrefix(key: string): string | undefined {
+  return AUTO_CODE_PREFIXES[key];
+}

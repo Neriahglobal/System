@@ -3,7 +3,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { saveResource } from "@/lib/admin/actions";
-import type { FieldDef, ResourceConfig } from "@/lib/admin/resources";
+import { AUTO_CODE_PREFIXES, type FieldDef, type ResourceConfig } from "@/lib/admin/resources";
 import type { OptionMap } from "@/lib/admin/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,17 +82,29 @@ export function ResourceForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {config.fields.map((f) => (
-          <FieldControl
-            key={f.name}
-            field={f}
-            value={values[f.name]}
-            options={f.optionsKey ? options[f.optionsKey] ?? [] : []}
-            error={fieldErrors[f.name]}
-            disabled={pending}
-            onChange={(v) => setField(f.name, v)}
-          />
-        ))}
+        {config.fields.map((f) => {
+          const autoPrefix = AUTO_CODE_PREFIXES[config.key];
+          const isCode = autoPrefix && f.name === config.codeField;
+          const field: FieldDef = isCode
+            ? {
+                ...f,
+                required: false,
+                placeholder: id ? f.placeholder : `Auto-generated (e.g. ${autoPrefix}-0001) — or type your own`,
+                help: id ? "Code cannot be changed after creation." : "Leave blank to auto-generate.",
+              }
+            : f;
+          return (
+            <FieldControl
+              key={f.name}
+              field={field}
+              value={values[f.name]}
+              options={f.optionsKey ? options[f.optionsKey] ?? [] : []}
+              error={fieldErrors[f.name]}
+              disabled={pending || Boolean(isCode && id)}
+              onChange={(v) => setField(f.name, v)}
+            />
+          );
+        })}
       </div>
 
       {error && (
