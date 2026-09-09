@@ -8,6 +8,7 @@ import {
   Receipt,
   ArrowLeftRight,
   BarChart3,
+  BookOpen,
   Settings,
 } from "lucide-react";
 
@@ -97,10 +98,43 @@ export const NAV: NavEntry[] = [
       { label: "Accounts", href: "/cash-and-banks", enabled: true, requires: "cash_accounts.view" },
       { label: "Cash Transfer", href: "/cash-and-banks/transfer", enabled: true, requires: "cash_transfers.create" },
       { label: "Transfers", href: "/cash-and-banks/transfers", enabled: true, requires: "cash_transfers.view" },
+      { label: "Reconciliation", href: "/cash-and-banks/reconciliation", enabled: true, requires: "reconciliation.view" },
       { label: "Opening Balances", href: "/cash-and-banks/opening-balances", enabled: true, requires: "cash_accounts.opening_balance" },
     ],
   },
-  { label: "Reports", icon: BarChart3, href: "/reports", enabled: false },
+  {
+    label: "Accounting",
+    icon: BookOpen,
+    enabled: true,
+    requires: "accounting.view",
+    items: [
+      { label: "Overview", href: "/accounting", enabled: true, requires: "accounting.view" },
+      { label: "Journals", href: "/accounting/journals", enabled: true, requires: "accounting.view_journals" },
+      { label: "Manual Journal", href: "/accounting/journals/new", enabled: true, requires: "accounting.create_manual_journal" },
+      { label: "General Ledger", href: "/accounting/general-ledger", enabled: true, requires: "accounting.view_general_ledger" },
+      { label: "Trial Balance", href: "/accounting/trial-balance", enabled: true, requires: "accounting.view_trial_balance" },
+      { label: "Opening Balances", href: "/accounting/opening-balances", enabled: true, requires: "accounting.manage_opening_balances" },
+      { label: "Reconciliation Controls", href: "/accounting/reconciliation-controls", enabled: true, requires: "accounting.view_control_accounts" },
+      { label: "Period Close", href: "/accounting/period-close", enabled: true, requires: "periods.view" },
+    ],
+  },
+  {
+    label: "Reports",
+    icon: BarChart3,
+    enabled: true,
+    requires: "reports.view",
+    items: [
+      { label: "Profit & Loss", href: "/reports/profit-and-loss", enabled: true, requires: "reports.view_profit_loss" },
+      { label: "Balance Sheet", href: "/reports/balance-sheet", enabled: true, requires: "reports.view_balance_sheet" },
+      { label: "Cash Flow", href: "/reports/cash-flow", enabled: true, requires: "reports.view_cash_flow" },
+      { label: "VAT Report", href: "/reports/vat", enabled: true, requires: "reports.view_vat" },
+      { label: "Receivables Ageing", href: "/reports/receivables-ageing", enabled: true, requires: "reports.view_receivables" },
+      { label: "Payables Ageing", href: "/reports/payables-ageing", enabled: true, requires: "reports.view_payables" },
+      { label: "Customer Statements", href: "/reports/customer-statements", enabled: true, requires: "reports.view_receivables" },
+      { label: "Supplier Statements", href: "/reports/supplier-statements", enabled: true, requires: "reports.view_payables" },
+      { label: "Inventory Valuation", href: "/reports/inventory-valuation", enabled: true, requires: "reports.view_inventory_valuation" },
+    ],
+  },
   { label: "Admin", icon: Settings, href: "/admin", enabled: true, ownerOnly: true },
 ];
 

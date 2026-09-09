@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { PayStatusBadge } from "@/components/common/doc-status-badge";
 import { formatMoney, formatDate } from "@/lib/format";
+import { profitAndLoss } from "@/lib/reports/queries";
+import { receivablesAgeing, payablesAgeing, vatReport } from "@/lib/reports/subledger";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -108,6 +110,30 @@ export default async function DashboardPage() {
   ].filter((s) => !s.hidden);
   void expToday; void incToday; void purToday;
 
+  // ---- Phase 4 financial section (permission-gated) ----
+  const showFin = can(user, "reports.view_profit_loss");
+  let fin: { label: string; value: string }[] = [];
+  if (showFin) {
+    const [pl, ar, ap, vat] = await Promise.all([
+      profitAndLoss(companyId, monthStart, today),
+      receivablesAgeing(companyId, today),
+      payablesAgeing(companyId, today),
+      vatReport(companyId, monthStart, today),
+    ]);
+    const overdueAr = ar.buckets.d1_30 + ar.buckets.d31_60 + ar.buckets.d61_90 + ar.buckets.d90;
+    const overdueAp = ap.buckets.d1_30 + ap.buckets.d31_60 + ap.buckets.d61_90 + ap.buckets.d90;
+    fin = [
+      { label: "Revenue (month)", value: formatMoney(pl.netSales) },
+      { label: "Gross profit", value: formatMoney(pl.grossProfit) },
+      { label: "Net profit (month)", value: formatMoney(pl.netProfit) },
+      { label: "Accounts receivable", value: formatMoney(ar.total) },
+      { label: "Overdue receivables", value: formatMoney(overdueAr) },
+      { label: "Accounts payable", value: formatMoney(ap.total) },
+      { label: "Overdue payables", value: formatMoney(overdueAp) },
+      { label: "VAT payable / (refund)", value: formatMoney(vat.netVat) },
+    ];
+  }
+
   return (
     <div>
       <PageHeader title={`Welcome${user.fullName ? `, ${user.fullName.split(" ")[0]}` : ""}`} description={`${company?.name ?? "Neriah ERP"} · Today ${formatDate(today)}`} />
@@ -133,6 +159,20 @@ export default async function DashboardPage() {
               <p className="text-xs text-muted-foreground">{s.label}</p>
             </Card>
           ))}
+        </div>
+      )}
+
+      {fin.length > 0 && (
+        <div className="mt-4">
+          <h2 className="mb-2 text-sm font-semibold">Financial summary</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {fin.map((s) => (
+              <Card key={s.label} className="p-4">
+                <p className="text-base font-semibold tabular-nums">{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 

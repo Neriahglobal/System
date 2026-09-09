@@ -24,6 +24,9 @@ export const RESOURCES = [
   "audit_log",
   "transactions",
   "cash_accounts",
+  "accounting",
+  "reconciliation",
+  "periods",
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -54,6 +57,32 @@ export const ACTIONS = [
   "record_payment",
   "view_balance",
   "view_ledger",
+  // Phase 4 accounting actions
+  "view_journals",
+  "create_manual_journal",
+  "post_manual_journal",
+  "post_control_account_adjustment",
+  "view_general_ledger",
+  "view_trial_balance",
+  "view_control_accounts",
+  "manage_opening_balances",
+  // Phase 4 report actions
+  "view_profit_loss",
+  "view_balance_sheet",
+  "view_cash_flow",
+  "view_vat",
+  "view_receivables",
+  "view_payables",
+  "view_inventory_valuation",
+  // Phase 4 reconciliation actions
+  "import_statement",
+  "match",
+  "finalize",
+  "reopen",
+  // Phase 4 period actions
+  "close",
+  "lock",
+  "unlock",
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
@@ -105,7 +134,18 @@ export const PERMISSION_DEFS: PermissionDef[] = [
     "transfer_create", "transfer_dispatch", "transfer_receive",
   ]),
   ...p("kardex", ["view", "export"]),
-  ...p("reports", ["view", "export"]),
+  ...p("reports", [
+    "view", "export",
+    "view_profit_loss", "view_balance_sheet", "view_cash_flow", "view_vat",
+    "view_receivables", "view_payables", "view_inventory_valuation",
+  ]),
+  ...p("accounting", [
+    "view", "view_journals", "create_manual_journal", "post_manual_journal",
+    "post_control_account_adjustment", "view_general_ledger", "view_trial_balance",
+    "view_control_accounts", "manage_opening_balances", "export",
+  ]),
+  ...p("reconciliation", ["view", "create", "import_statement", "match", "finalize", "reopen"]),
+  ...p("periods", ["view", "close", "reopen", "lock", "unlock"]),
   ...p("admin", ["view", "manage"]),
   ...p("users", ["view", "manage"]),
   ...p("roles", ["view", "manage"]),
@@ -157,6 +197,8 @@ export const ROLE_DEFS: RoleDef[] = [
       "inventory.transfer_create", "inventory.transfer_dispatch", "inventory.transfer_receive",
       "kardex.view", "kardex.export",
       "reports.view", "reports.export",
+      "reports.view_profit_loss", "reports.view_receivables", "reports.view_payables", "reports.view_inventory_valuation",
+      "periods.view",
     ],
   },
   {
@@ -178,6 +220,12 @@ export const ROLE_DEFS: RoleDef[] = [
       "inventory.view", "inventory.view_cost", "inventory.view_kardex",
       "kardex.view", "kardex.export",
       "reports.view", "reports.export",
+      "reports.view_profit_loss", "reports.view_balance_sheet", "reports.view_cash_flow",
+      "reports.view_vat", "reports.view_receivables", "reports.view_payables", "reports.view_inventory_valuation",
+      "accounting.view", "accounting.view_journals", "accounting.create_manual_journal",
+      "accounting.view_general_ledger", "accounting.view_trial_balance", "accounting.view_control_accounts", "accounting.export",
+      "reconciliation.view", "reconciliation.create", "reconciliation.import_statement", "reconciliation.match", "reconciliation.finalize",
+      "periods.view",
     ],
   },
   {
@@ -222,6 +270,11 @@ export const ROLE_DEFS: RoleDef[] = [
       "cash_accounts.view", "cash_accounts.view_ledger",
       "inventory.view", "inventory.view_kardex", "kardex.view", "kardex.export",
       "reports.view", "reports.export",
+      "reports.view_profit_loss", "reports.view_balance_sheet", "reports.view_cash_flow",
+      "reports.view_vat", "reports.view_receivables", "reports.view_payables", "reports.view_inventory_valuation",
+      "accounting.view", "accounting.view_journals", "accounting.view_general_ledger",
+      "accounting.view_trial_balance", "accounting.view_control_accounts", "accounting.export",
+      "reconciliation.view", "periods.view",
     ],
   },
 ];

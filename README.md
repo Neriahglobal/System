@@ -326,6 +326,106 @@ A purchase cannot be voided while it has posted supplier payments or purchase re
 those first) or if removing its stock would go negative. A cash transfer void is blocked if the
 destination lacks the funds to give back.
 
+---
+
+# Phase 4 — Core Accounting, Financial Reports & Controls
+
+## Accounting architecture
+Every posted operational transaction (sale, purchase, expense, income, transfer, receipt,
+return) writes a **balanced journal entry** via the Phase 2/3 posting RPCs. Phase 4 adds the
+reporting and control layer on top: **all financial statements are generated from posted
+`journal_lines`**, never recomputed from the operational tables. Subledgers (customers,
+suppliers, stock, payment accounts) provide detail and are reconciled to the GL on the
+Reconciliation Controls page. Reversal journals are ordinary journals and are included by
+date — reports follow journal movements, not source-document status.
+
+## Setup
+Adds migrations `0019`–`0022`. On an existing Phase 3 database:
+```bash
+npm run db:migrate      # 0019 schema, 0020 report fns, 0021 posting RPCs, 0022 RLS
+npm run db:seed         # Phase 4 permissions + role grants
+npm run test:phase4     # accounting integration test (rolls back)
+```
+`0019` adds a `cashflow_class` and `is_control` flag to the chart of accounts and marks the
+control accounts (Cash/Bank/Mobile/AR/AP/Inventory/VAT).
+
+## Journal rules
+Debits must equal credits; a line is debit **or** credit, never both; no zero lines; ≥2 lines;
+accounts must be active, non-header, same company; the date must be in an open period; posted
+journals are immutable (DB triggers); one active original journal per source
+(`unique(source_type, source_id)`); reversals link by a `*_void` source type.
+
+## Manual journals
+`/accounting/journals/new`. Accountant creates a draft; a poster (permission
+`accounting.post_manual_journal`) posts it. **Direct posting to control accounts is blocked**
+unless the user holds `accounting.post_control_account_adjustment` (Owner) — those post as an
+audited control adjustment. Only the Owner deletes drafts or voids posted journals (void =
+reversing journal). Manual journals never change inventory quantities.
+
+## Reports (from posted journals)
+- **General Ledger** `report_gl_lines` + opening from `report_account_balance`, running balance.
+- **Trial Balance** `report_trial_balance` — closing debits must equal credits (flagged if not).
+- **Profit & Loss** — period movements on revenue/cost-of-sales/expense accounts; net sales =
+  4100 − 4900; gross profit = net sales − COGS; bank charges (6200) shown under finance.
+- **Balance Sheet** — as-of closing balances; equity includes **current-period earnings** = the
+  net of all P&L accounts (no year-end close journal in Phase 4, so earnings accrue live);
+  flags an exception if Assets ≠ Liabilities + Equity.
+- **Cash Flow** `report_cash_flow` — net movement on cash/bank/mobile accounts bucketed by
+  source; transfers/openings excluded from operating; manual/opening cash movements land in an
+  Unclassified exception; closing reconciles to payment-account balances.
+- **VAT** — from posted transaction tax snapshots (sales/returns/income = output;
+  purchases/returns/expenses recoverable = input), reconciled to control accounts 2120/1160.
+- **Receivables / Payables ageing** — as-of outstanding (payments after the as-of date are
+  excluded), bucketed Not-due/1-30/31-60/61-90/90+, reconciled to AR (1140) / AP (2110).
+- **Customer / Supplier statements** — opening balance + dated movements + running balance.
+- **Inventory Valuation** — current from `stock_balances`; historical reconstructed from the
+  immutable `stock_movements` running snapshots; reconciled to Inventory (1150).
+
+## Bank reconciliation
+`/cash-and-banks/reconciliation`. Create a statement period + opening/closing, import lines
+(CSV paste; duplicate rows rejected by fingerprint), match statement lines to posted ERP
+journal lines (one-to-one/partial; overmatch blocked; an ERP line can't be matched twice), or
+create an **adjustment** (posts a balanced journal, e.g. bank charges). Finalize requires all
+lines resolved and statement lines to equal closing − opening. Only the Owner reopens
+(reason + audit). No live bank integration.
+
+## Opening balances
+`/accounting/opening-balances` (Owner). General GL openings (no direct control-account
+posting), plus customer and supplier opening documents (Dr AR / Cr OBE and Dr OBE / Cr AP)
+that appear in the ageing reports. Payment-account and inventory openings remain in their
+Phase 2/3 workflows.
+
+## Period closing
+`/accounting/period-close`. Statuses Open → Closed → Locked. Closing runs an automated
+checklist (unposted drafts, negative stock, subledger vs GL differences = **blocking**;
+open transfers/reconciliations = **warning**). The Owner cannot close with blocking issues;
+warnings need a written explanation (stored in the audit trail). Only the Owner reopens or
+unlocks (reason + audit). Posting into a closed/locked period is blocked at the DB layer by
+`assert_period_open` inside every posting RPC.
+
+## Permissions
+`accounting.*` (view, view_journals, create/post_manual_journal, post_control_account_adjustment,
+view_general_ledger, view_trial_balance, view_control_accounts, manage_opening_balances, export),
+`reports.view_*` per statement, `reconciliation.*`, `periods.*`. Accountant gets reports +
+manual-journal drafts + reconciliation by default but **not** manual-journal posting or
+control adjustments unless the Owner grants them. Only the Owner reopens/unlocks periods,
+voids posted journals, or deletes drafts.
+
+## Audit controls
+Manual-journal create/post/void, control-account adjustments, opening-balance posting,
+reconciliation create/import/match/adjust/finalize/reopen, and period close/reopen/lock/unlock
+are all written to `audit_logs`.
+
+## Phase 4 testing
+`npm run test:phase4` posts balanced/unbalanced/control/header manual journals, a void reversal,
+and a customer opening through the real RPCs, and asserts trial-balance equality — inside a
+transaction that rolls back.
+
+## Out of scope (deferred)
+Payroll, budgeting/forecasting, fixed-asset depreciation, multi-currency & FX, landed cost,
+purchase orders, separate GRNs, live bank feeds, TRA/EFD filing, intercompany elimination /
+statutory consolidation, manufacturing, loan schedules.
+
 ## Phase 3 testing
 `npm run test:phase3` posts purchases (weighted-avg + recoverable-VAT split), supplier payments,
 purchase returns (price variance), expenses, other income and cash transfers through the real

@@ -111,3 +111,10 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+@media print {
+  aside, header, .print-hide { display: none !important; }
+  main { padding: 0 !important; }
+  body { background: #fff !important; }
+  .report-card { box-shadow: none !important; border: none !important; }
+}
